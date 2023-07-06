@@ -3,12 +3,16 @@ import httpx
 import time
 import asyncio
 from Utility.loadDbUtility import loadData, totalPageCount, dataAdded
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 logInUrl = 'https://www.banqueteasy.com/access'
 logInPayload = {
-    'username': '9769494336',
-    'pwd': '9769494336'
+    'username': os.getenv('USERNAME_BANQUETE'),
+    'pwd': os.getenv('PASSWORD_BANQUETE')
 }
+
 enquiriesUrl = 'https://www.banqueteasy.com/erp/main.php?Pg=enquiries'
 
 
