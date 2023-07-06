@@ -1,25 +1,29 @@
 from dbModel import Session, Enquiry
 from sqlalchemy import exists
 from bs4 import BeautifulSoup
-dataAdded=0
+
+
+async def chechNumber(number):
+    number = number.replace(' ', '').replace('+91', '')
+    return number if len(number) == 10 else False
 
 
 async def loadData(response):
-    global dataAdded 
     soup = BeautifulSoup(response.content, 'html.parser')
     rows = soup.find('tbody').findChildren('tr')
     
     session = Session()
     for row in rows:
         columns = row.find_all('td')
-        selectedColumns = columns[1:2] + columns[3:11] + columns[12:17]
+        selectedColumns = columns[1:2] +columns[3:11] + columns[12:17]
         data = [column.text.strip() for column in selectedColumns]
-        print(data)
+        data[1] = await chechNumber(data[1])
+        if not data[1]:
+            continue
         q = session.query(exists().where(Enquiry.Contact == data[1])).subquery()
         if not session.query(q).scalar():
             session.add(Enquiry(*data))
             session.commit()
-            dataAdded+=1
 
 
 async def totalPageCount(response):
