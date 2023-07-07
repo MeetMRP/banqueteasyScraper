@@ -2,10 +2,13 @@ from fastapi import FastAPI
 import httpx
 import time
 import asyncio
-from Utility.loadDbUtility import loadData, totalPageCount, dataAdded
+from Utility.loadDbUtility import loadData, totalPageCount
+from Utility.sendMessageUtility import sendWaMessage
+from dbModel import Session, Enquiry
 import os
 from dotenv import load_dotenv
 load_dotenv()
+
 
 logInUrl = 'https://www.banqueteasy.com/access'
 logInPayload = {
@@ -23,11 +26,12 @@ app = FastAPI()
 async def root():
     return {
         'Load DB': '/addData',
+        'Sent message': '/sendMessage'
     }
 
 
 @app.get("/addData")
-async def root():
+async def addData():
     start_time = time.time()
     timeout = httpx.Timeout(60.0)
     async with httpx.AsyncClient(timeout=timeout) as client:
@@ -42,4 +46,20 @@ async def root():
 
         for response in responses:
             await loadData(response)
-    return {"message": "Success", "Response time": f"{time.time() - start_time}", "Number of New data added": dataAdded}
+
+    return {
+        "Message": "Success", 
+        "Response time": f"{time.time() - start_time}", 
+    }
+
+
+@app.get("/sendMessage")
+async def sendMessage():
+    session = Session()
+    results = session.query(Enquiry.Contact, Enquiry.Next_Call).filter(Enquiry.Status != 'Not Interested', Enquiry.Status != 'Converted', Enquiry.Followup != '3').all()
+
+    await sendWaMessage(results, session)
+
+    return {
+        "Message": "Success"
+    }
