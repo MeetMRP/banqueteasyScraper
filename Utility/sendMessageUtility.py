@@ -1,6 +1,10 @@
 from datetime import date, timedelta
 from dbModel import Enquiry
 from sqlalchemy import update
+import requests
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 async def getMessageNewDate(followUp):
     if followUp == '0':
@@ -23,17 +27,28 @@ async def getMessageNewDate(followUp):
 
 async def pushMessage(number, followUp, session):
     message, newDate, newFollowUp = await getMessageNewDate(followUp)
-    print(f'message: {message}\nnewDate:{newDate}\nnewFollowUp:{newFollowUp}\n')
 
-    #sent message
-    
-    updateStatement = (
-        update(Enquiry)
-        .where(Enquiry.Contact == number)
-        .values(Followup = newFollowUp, Next_Call = newDate)  
-    )
-    session.execute(updateStatement)
-    session.commit()
+    url = "https://whatsapp.leadzen.ai/api/send.php/"
+    params = {
+        "number": f'91{number}',
+        "type": 'text',
+        "message": message,
+        "instance_id": os.getenv('INSTANCE_ID'),
+        "access_token": os.getenv('ACCESS_TOKEN')
+    }
+
+    response = await requests.get(url, params=params)
+
+    if response.status == 'success':
+        updateStatement = (
+            update(Enquiry)
+            .where(Enquiry.Contact == number)
+            .values(Followup = newFollowUp, Next_Call = newDate)  
+        )
+        session.execute(updateStatement)
+        session.commit()
+    else:
+        print(response.message)
 
 
 async def checkFollowUpAndSend(number, session):
@@ -43,10 +58,9 @@ async def checkFollowUpAndSend(number, session):
 
 async def sendWaMessage(results, session):
     currentDate = date.today().strftime('%d-%b-%Y')
-    print("currentDate: ", currentDate)
     for result in results:
-        nextDate = result[1] 
-        if nextDate == currentDate:
+        lastCall = result[1] 
+        nextDate = result[2]
+        if nextDate == currentDate or (lastCall == '-' and nextDate == '-'):
             number = result[0]
-            print(number)
             await checkFollowUpAndSend(number, session)
