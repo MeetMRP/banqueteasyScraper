@@ -1,3 +1,4 @@
+from fastapi import HTTPException
 from datetime import date, timedelta
 from dbModel import Enquiry
 from sqlalchemy import update
@@ -5,6 +6,7 @@ import requests
 import os
 from dotenv import load_dotenv
 load_dotenv()
+
 
 async def getMessageNewDate(followUp):
     if followUp == '0':
@@ -39,22 +41,22 @@ async def pushMessage(number, followUp, session):
 
     response = await requests.get(url, params=params)
 
-    if response.status == 'success':
-        updateStatement = (
-            update(Enquiry)
-            .where(Enquiry.Contact == number)
-            .values(Followup = newFollowUp, Next_Call = newDate)  
-        )
-        session.execute(updateStatement)
-        session.commit()
-    else:
-        print(response.message)
+    if response.status != 'success':
+        raise HTTPException(detail=f'Failed to send whatsapp message to {number}')
+    updateStatement = (
+        update(Enquiry)
+        .where(Enquiry.Contact == number)
+        .values(Followup = newFollowUp, Next_Call = newDate)  
+    )
+    session.execute(updateStatement)
+    session.commit()
+        
 
 
 async def checkFollowUpAndSend(number, session):
     followUp = session.query(Enquiry.Followup).filter(Enquiry.Contact == number).first()[0]
-
     await pushMessage(number, followUp, session)
+
 
 async def sendWaMessage(results, session):
     currentDate = date.today().strftime('%d-%b-%Y')
