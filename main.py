@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 import httpx
 import time
 import asyncio
@@ -35,10 +35,13 @@ async def addData():
     start_time = time.time()
     timeout = httpx.Timeout(60.0)
     async with httpx.AsyncClient(timeout=timeout) as client:
+        
+        loginResponse = await client.post(logInUrl, data=logInPayload) #login to site
 
-        await client.post(logInUrl, data=logInPayload) #login request
+        if loginResponse.headers.get("location") is None:
+            raise HTTPException(status_code=401, detail="Incorrect Username, Password")
+        
         response = await client.get(enquiriesUrl, params={'pgn': 1}) #request for pg count
-
         totalPages = await totalPageCount(response)
 
         reqs = [client.get(enquiriesUrl, params={'pgn': page}) for page in totalPages]
@@ -46,7 +49,7 @@ async def addData():
 
         for response in responses:
             await loadData(response)
-
+            
     return {
         "Message": "Success", 
         "Response time": f"{time.time() - start_time}", 
