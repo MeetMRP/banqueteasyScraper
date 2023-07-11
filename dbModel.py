@@ -16,13 +16,11 @@ class Enquiry(Base):
     Event_Date = Column('Event Date', String, nullable=True)
     User = Column('User', String, nullable=True)
     Owners = Column('Owners', String, nullable=True)
-    Last_Call = Column('Last Call', String, nullable=True)
-    Next_Call = Column('Next Call', String, nullable=True)
     Lead_Source = Column('Lead Source', String, nullable=True)
     Status = Column('Status', String, nullable=True)
     Followup = Column('Followup', String, nullable=True)
 
-    def __init__(self, Fullname, Contact, Pax, Banquets, Event, Enquiry_Date, Event_Date, User, Owners, Last_Call, Next_Call, Lead_Source, Status, Followup):
+    def __init__(self, Fullname, Contact, Pax, Banquets, Event, Enquiry_Date, Event_Date, User, Owners, Lead_Source, Status, Followup):
         self.Fullname = Fullname
         self.Contact = Contact
         self.Pax = Pax
@@ -32,8 +30,6 @@ class Enquiry(Base):
         self.Event_Date = Event_Date
         self.User = User
         self.Owners = Owners
-        self.Last_Call = Last_Call
-        self.Next_Call = Next_Call
         self.Lead_Source = Lead_Source 
         self.Status = Status
         self.Followup =  Followup
