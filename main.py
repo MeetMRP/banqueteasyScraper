@@ -59,8 +59,11 @@ async def addData():
 @app.get("/sendMessage")
 async def sendMessage():
     session = Session()
-    results = session.query(Enquiry.Contact, Enquiry.Last_Call ,Enquiry.Next_Call).filter(Enquiry.Status != 'Not Interested', Enquiry.Status != 'Converted', Enquiry.Followup != '3').all()
-    # print(results)
+    results = session.query(Enquiry.Contact, Enquiry.Enquiry_Date).filter(    
+        Enquiry.Status.notin_(['Not Interested', 'Converted']),
+        Enquiry.Followup.in_(['0', '1', '2'])
+    ).all()
+
     await sendWaMessage(results, session)
 
     return {
