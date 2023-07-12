@@ -3,9 +3,34 @@ from datetime import date, timedelta, datetime
 from dbModel import Enquiry
 from sqlalchemy import update
 import requests
+import smtplib
+from email.mime.text import MIMEText
 import os
 from dotenv import load_dotenv
 load_dotenv()
+
+
+async def send_email_notification(exception, number):
+    # Compose the email content
+    subject = "Exception Report"
+    body = f"An exception occurred while sending a WhatsApp message to {number}:\n\n{str(exception)}"
+    sender_email = os.getenv('Mail_USERNAME')
+    receiver_email = "malharlakdawala@gmail.com"
+    message = MIMEText(body)
+    message["Subject"] = subject
+    message["From"] = sender_email
+    message["To"] = receiver_email
+
+    # Connect to the SMTP server and send the email
+    smtp_server = os.getenv('Mail_HOST')
+    smtp_port = os.getenv('Mail_PORT')
+    smtp_username = os.getenv('Mail_USERNAME')
+    smtp_password = os.getenv('Mail_PASSWORD')
+
+    with smtplib.SMTP(smtp_server, smtp_port) as server:
+        server.starttls()
+        server.login(smtp_username, smtp_password)
+        server.sendmail(sender_email, receiver_email, message.as_string())
 
 
 async def pushMessage(number, message):
@@ -18,11 +43,15 @@ async def pushMessage(number, message):
         "instance_id": os.getenv('INSTANCE_ID'),
         "access_token": os.getenv('ACCESS_TOKEN')
     }
-
-    response = await requests.get(url, params=params)
-
-    if response.status != 'success':
-        raise HTTPException(detail=f'Failed to send whatsapp message to {number}')
+    
+    try:
+        response = await requests.get(url, params=params)
+        response.raise_for_status()
+    except Exception as e:
+        await send_email_notification(e, number)
+        raise HTTPException(
+            detail=f'Failed to send WhatsApp message to {number}'
+        ) from e
 
 
 async def sendFollowup(number, session, followUp):
