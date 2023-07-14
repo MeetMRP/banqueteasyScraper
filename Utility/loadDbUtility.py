@@ -1,7 +1,6 @@
 from dbModel import Session, Enquiry
 from sqlalchemy import exists
 from bs4 import BeautifulSoup
-from datetime import timedelta, datetime
 
 
 async def chechNumber(number):

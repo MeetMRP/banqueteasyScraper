@@ -63,7 +63,7 @@ async def sendFollowup(number, session, followUp):
         message = 'Hey Hi, we have received an inquiry for similar date at Millennium Club as yours, so wanted to check with you on this'
     print(f'{number}, {followUp}')
 
-    pushMessage(number, message)
+    await pushMessage(number, message)
     updateStatement = (
         update(Enquiry)
         .where(Enquiry.Contact == number)
@@ -79,6 +79,7 @@ async def sendWaMessage(results, session):
 
     for result in results:
         number = result[0]
+        currentFollowUp = int(result[2])
         enquiryDate = datetime.strptime(result[1], "%d-%b-%Y %I:%M %p").strftime("%d-%b-%Y")
 
         dayOne = [datetime.strptime(enquiryDate, "%d-%b-%Y"), 1]
@@ -86,5 +87,5 @@ async def sendWaMessage(results, session):
         daySeven = [(dayOne[0] + timedelta(days=7)).strftime("%d-%b-%Y"), 3]
 
         for Date in [dayOne, dayThree, daySeven]:
-            if currentDate == Date[0]:
+            if currentDate == Date[0] and currentFollowUp < Date[1]:
                 await sendFollowup(number, session, Date[1])
