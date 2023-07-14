@@ -1,12 +1,10 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.encoders import jsonable_encoder
 import httpx
 import time
 import asyncio
-from Utility.loadDbUtility import loadData, totalPageCount
+from Utility.loadDbUtility import collectData, totalPageCount, bulkLoad
 from Utility.sendMessageUtility import sendWaMessage
-from dbModel import Session, Enquiry
-from sqlalchemy import func
+import motor.motor_asyncio
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -20,6 +18,9 @@ logInPayload = {
 
 enquiriesUrl = 'https://www.banqueteasy.com/erp/main.php?Pg=enquiries'
 
+API_CONFIG_MONGODB_URL = os.getenv(
+    "API_CONFIG_MONGODB_URL"
+)
 
 app = FastAPI()
 
@@ -50,9 +51,15 @@ async def addData():
         reqs = [client.get(enquiriesUrl, params={'pgn': page}) for page in totalPages]
         responses = await asyncio.gather(*reqs)
 
+        insertList = []
         for response in responses:
-            await loadData(response)
-            
+            insertList.extend(await collectData(response))
+        
+        testSet = {i['Contact'] for i in insertList}
+        print("testSet: ", len(testSet))
+
+        await bulkLoad(insertList)
+
     return {
         "Message": "Success", 
         "Response time": f"{time.time() - start_time}", 
@@ -61,13 +68,26 @@ async def addData():
 
 @app.get("/sendMessage")
 async def sendMessage():
-    session = Session()
-    results = session.query(Enquiry.Contact, Enquiry.Enquiry_Date, Enquiry.Followup).filter(    
-        Enquiry.Status.notin_(['Not Interested', 'Converted']),
-        Enquiry.Followup.in_(['0', '1', '2'])
-    ).all()
+    client = motor.motor_asyncio.AsyncIOMotorClient(
+        API_CONFIG_MONGODB_URL,
+        maxPoolSize=10
+    )
+    db = client['leadzen_banqueteasy']
+    collection = db['enquiries']
 
-    await sendWaMessage(results, session)
+    results = await collection.find(
+        {
+            'Status': {'$nin': ['Not Interested', 'Converted']},
+            'Followup': {'$in': ['0', '1', '2']}
+        },
+        {
+            'Contact': 1,
+            'Enquiry_Date': 1,
+            'Followup': 1
+        }
+    ).to_list(None)
+
+    await sendWaMessage(results, collection)
 
     return {
         "Message": "Success"
@@ -76,21 +96,26 @@ async def sendMessage():
 
 @app.get("/getData")
 async def getData():
-    session = Session()
-    results = session.query(Enquiry.Fullname, Enquiry.Contact, Enquiry.Enquiry_Date, Enquiry.Status, Enquiry.Followup).all()
+    client = motor.motor_asyncio.AsyncIOMotorClient(
+        API_CONFIG_MONGODB_URL,
+        maxPoolSize=10
+    )
+    db = client['leadzen_banqueteasy']
+    collection = db['enquiries']
 
+    results = await collection.find({}, {'Fullname': 1, 'Contact': 1, 'Enquiry_Date': 1, 'Status': 1, 'Followup': 1}).to_list(None)
     json_results = [
         {
-            "Fullname": fullname,
-            "Contact": contact,
-            "Enquiry Date": enquiry_date,
-            "Status": status,
-            "Followup": followup,
+            "Fullname": result['Fullname'],
+            "Contact": result['Contact'],
+            "Enquiry Date": result['Enquiry_Date'],
+            "Status": result['Status'],
+            "Followup": result['Followup']
         }
-        for fullname, contact, enquiry_date, status, followup in results
+        for result in results
     ]
-    count = session.query(func.count()).select_from(Enquiry).scalar()
-    return jsonable_encoder({
+    count = await collection.count_documents({})
+    return {
         "Count": count,
-        "Results": json_results,
-    })
+        "Results": json_results
+    }

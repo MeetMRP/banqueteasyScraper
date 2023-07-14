@@ -1,7 +1,5 @@
 from fastapi import HTTPException
 from datetime import date, timedelta, datetime
-from dbModel import Enquiry
-from sqlalchemy import update
 import requests
 import smtplib
 from email.mime.text import MIMEText
@@ -45,42 +43,39 @@ async def pushMessage(number, message):
     }
     
     try:
-        response = await requests.get(url, params=params)
+        response = requests.get(url, params=params)
         response.raise_for_status()
     except Exception as e:
         await send_email_notification(e, number)
         raise HTTPException(
+            status_code=500,
             detail=f'Failed to send WhatsApp message to {number}'
         ) from e
 
 
-async def sendFollowup(number, session, followUp):
+async def sendFollowup(number, collection, followUp):
     if followUp == 1:
         message = 'Thank you for visiting Club Millennium, do let me know in case you need any more information'
     elif followUp == 2:
         message = 'Hey Hi, just wanted to check an update on the inquiry you did at Millennium Club'
     elif followUp == 3:
         message = 'Hey Hi, we have received an inquiry for similar date at Millennium Club as yours, so wanted to check with you on this'
+    
+    await pushMessage(number, message.replace(' ', '%20'))
+    await collection.update_one(
+        {'Contact': number},
+        {'$set': {'Followup': followUp}}
+    )
     print(f'{number}, {followUp}')
 
-    await pushMessage(number, message.replace(' ', '%20'))
-    updateStatement = (
-        update(Enquiry)
-        .where(Enquiry.Contact == number)
-        .values(Followup = f'{followUp}')  
-    )
-    session.execute(updateStatement)
-    session.commit()
-
-
-async def sendWaMessage(results, session):
+async def sendWaMessage(results, collection):
     currentDate = date.today().strftime('%d-%b-%Y')
     print(currentDate)
 
     for result in results:
-        number = result[0]
-        currentFollowUp = int(result[2])
-        enquiryDate = datetime.strptime(result[1], "%d-%b-%Y %I:%M %p").strftime("%d-%b-%Y")
+        number = result['Contact']
+        currentFollowUp = int(result['Followup'])
+        enquiryDate = datetime.strptime(result['Enquiry_Date'], "%d-%b-%Y %I:%M %p").strftime("%d-%b-%Y")
 
         dayOne = [datetime.strptime(enquiryDate, "%d-%b-%Y"), 1]
         dayThree = [(dayOne[0] + timedelta(days=3)).strftime("%d-%b-%Y"), 2]
@@ -88,4 +83,4 @@ async def sendWaMessage(results, session):
 
         for Date in [dayOne, dayThree, daySeven]:
             if currentDate == Date[0] and currentFollowUp < Date[1]:
-                await sendFollowup(number, session, Date[1])
+                await sendFollowup(number, collection, Date[1])
