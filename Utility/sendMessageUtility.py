@@ -63,7 +63,7 @@ async def sendFollowup(number, session, followUp):
         message = 'Hey Hi, we have received an inquiry for similar date at Millennium Club as yours, so wanted to check with you on this'
     print(f'{number}, {followUp}')
 
-    await pushMessage(number, message)
+    await pushMessage(number, message.replace(' ', '%20'))
     updateStatement = (
         update(Enquiry)
         .where(Enquiry.Contact == number)
